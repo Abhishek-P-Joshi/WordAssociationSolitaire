@@ -5,13 +5,26 @@ import { WordCard } from '../types.ts';
 interface CardProps {
   card: WordCard;
   onClick: () => void;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
   isSelected?: boolean;
+  isDragging?: boolean;
   stacked?: boolean;
   targetCount?: number;
   currentCount?: number;
 }
 
-const Card: React.FC<CardProps> = ({ card, onClick, isSelected, stacked, targetCount, currentCount }) => {
+const Card: React.FC<CardProps> = ({ 
+  card, 
+  onClick, 
+  onDragStart, 
+  onDragEnd, 
+  isSelected, 
+  isDragging,
+  stacked, 
+  targetCount, 
+  currentCount 
+}) => {
   const isFaceUp = card.isFaceUp;
   const color = card.color || 'bg-slate-700';
   const isMaster = card.isMaster;
@@ -19,11 +32,16 @@ const Card: React.FC<CardProps> = ({ card, onClick, isSelected, stacked, targetC
   return (
     <div 
       onClick={onClick}
+      draggable={isFaceUp && !isDragging}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       className={`
         relative w-24 h-36 md:w-28 md:h-40 cursor-pointer 
         transition-all duration-300 transform perspective-1000
-        ${isSelected ? '-translate-y-4 scale-105 z-50' : ''}
+        ${isSelected ? '-translate-y-4 scale-105 z-[60]' : ''}
+        ${isDragging ? 'opacity-40 scale-95 grayscale' : 'opacity-100'}
         ${stacked ? '-mt-28 md:-mt-32' : ''}
+        ${isFaceUp ? 'hover:z-[50] hover:scale-[1.02]' : 'z-0'}
       `}
     >
       <div className={`
@@ -31,14 +49,17 @@ const Card: React.FC<CardProps> = ({ card, onClick, isSelected, stacked, targetC
         ${isFaceUp ? '' : 'card-flip-flipped'}
       `}>
         {/* Front Face */}
-        <div className={`
-          card-face absolute inset-0 w-full h-full rounded-xl border-2
-          ${isMaster 
-            ? 'bg-slate-900 border-slate-700 shadow-[0_0_20px_rgba(0,0,0,0.5)]' 
-            : 'bg-white border-slate-200 shadow-sm'}
-          flex flex-col items-center justify-center p-2
-          ${isSelected ? '!border-indigo-500 ring-2 ring-indigo-500/50' : ''}
-        `}>
+        <div 
+          style={{ visibility: isFaceUp ? 'visible' : 'hidden' }}
+          className={`
+            card-face absolute inset-0 w-full h-full rounded-xl border-2
+            ${isMaster 
+              ? 'bg-slate-900 border-slate-700 shadow-[0_0_20px_rgba(0,0,0,0.5)]' 
+              : 'bg-white border-slate-200 shadow-sm'}
+            flex flex-col items-center justify-center p-2
+            ${isSelected ? '!border-indigo-500 ring-2 ring-indigo-500/50' : ''}
+          `}
+        >
           <div className={`w-full h-full rounded-lg flex flex-col items-center justify-center relative overflow-hidden ${isMaster ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
             
             {isMaster ? (
@@ -71,7 +92,7 @@ const Card: React.FC<CardProps> = ({ card, onClick, isSelected, stacked, targetC
               </>
             ) : (
               <>
-                {/* Regular Word Card - Absolutely No Color Indicators */}
+                {/* Regular Word Card */}
                 <span className="text-sm font-bold text-slate-800 text-center px-2 break-words leading-tight tracking-tight">
                   {card.word}
                 </span>
@@ -79,7 +100,6 @@ const Card: React.FC<CardProps> = ({ card, onClick, isSelected, stacked, targetC
             )}
           </div>
           
-          {/* Corner decoration - neutral for word cards */}
           {!isMaster && (
             <div className="absolute top-1.5 right-1.5 opacity-5">
                <div className={`w-3 h-3 border-t border-r border-slate-900`}></div>
@@ -88,7 +108,10 @@ const Card: React.FC<CardProps> = ({ card, onClick, isSelected, stacked, targetC
         </div>
 
         {/* Back Face */}
-        <div className="card-face card-back absolute inset-0 w-full h-full rounded-xl bg-indigo-700 border-4 border-indigo-300 shadow-inner overflow-hidden">
+        <div 
+          style={{ visibility: isFaceUp ? 'hidden' : 'visible' }}
+          className="card-face card-back absolute inset-0 w-full h-full rounded-xl bg-indigo-700 border-4 border-indigo-300 shadow-inner overflow-hidden"
+        >
           <div className="w-full h-full flex items-center justify-center bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-500 to-indigo-900">
              <div className="w-12 h-12 rounded-full border-2 border-indigo-400/20 animate-pulse"></div>
              <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>

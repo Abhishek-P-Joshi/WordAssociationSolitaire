@@ -24,6 +24,7 @@ const App: React.FC = () => {
 
   const [currentLevel, setCurrentLevel] = useState<GameLevel | null>(null);
   const [clearingSlot, setClearingSlot] = useState<number | null>(null);
+  const [dragOverPile, setDragOverPile] = useState<{ type: 'tableau' | 'foundation'; index: number } | null>(null);
 
   const startNewGame = useCallback(async (selectedTheme?: string, selectedDifficulty?: DifficultyLevel) => {
     const targetTheme = selectedTheme || GAME_THEMES[Math.floor(Math.random() * GAME_THEMES.length)];
@@ -62,6 +63,25 @@ const App: React.FC = () => {
     if (!currentLevel) return 0;
     const cat = currentLevel.categories.find(c => c.name === categoryName);
     return cat ? cat.words.length : 0; 
+  }, [currentLevel]);
+
+  const finalizeFoundation = useCallback((fIdx: number) => {
+    setClearingSlot(fIdx);
+    setTimeout(() => {
+      setGameState(prev => {
+        const newFoundations = prev.foundations.map((f, idx) => idx === fIdx ? [] : [...f]);
+        const newSolved = prev.solvedCategories + 1;
+        const totalCats = currentLevel?.categories.length || 0;
+        
+        return {
+          ...prev,
+          foundations: newFoundations,
+          solvedCategories: newSolved,
+          status: newSolved === totalCats ? 'won' : 'playing'
+        };
+      });
+      setClearingSlot(null);
+    }, 600);
   }, [currentLevel]);
 
   const checkGameOver = useCallback((state: GameState) => {
@@ -153,24 +173,47 @@ const App: React.FC = () => {
     }
   };
 
-  const finalizeFoundation = useCallback((fIdx: number) => {
-    setClearingSlot(fIdx);
-    setTimeout(() => {
-      setGameState(prev => {
-        const newFoundations = prev.foundations.map((f, idx) => idx === fIdx ? [] : [...f]);
-        const newSolved = prev.solvedCategories + 1;
-        const totalCats = currentLevel?.categories.length || 0;
-        
-        return {
-          ...prev,
-          foundations: newFoundations,
-          solvedCategories: newSolved,
-          status: newSolved === totalCats ? 'won' : 'playing'
-        };
-      });
-      setClearingSlot(null);
-    }, 600);
-  }, [currentLevel]);
+  const executeMoveToTableau = (targetPileIndex: number, sP: number, sC: number, source: 'tableau' | 'waste' | 'foundation') => {
+    setGameState(prev => {
+      const next = { ...prev, tableau: prev.tableau.map(p => [...p]), foundations: prev.foundations.map(f => [...f]) };
+      let moved: WordCard[] = [];
+      
+      if (source === 'tableau') {
+        moved = next.tableau[sP].splice(sC);
+        if (next.tableau[sP].length > 0) next.tableau[sP][next.tableau[sP].length - 1].isFaceUp = true;
+      } else if (source === 'waste') {
+        moved = [next.waste.pop()!];
+      } else if (source === 'foundation') {
+        moved = [next.foundations[sP].pop()!];
+      }
+      
+      next.tableau[targetPileIndex].push(...moved);
+      next.selectedCard = null;
+      next.moves += 1;
+      return next;
+    });
+  };
+
+  const executeMoveToFoundation = (fIdx: number, sP: number, sC: number, source: 'tableau' | 'waste' | 'foundation') => {
+    setGameState(prev => {
+      const next = { ...prev, foundations: prev.foundations.map(f => [...f]), tableau: prev.tableau.map(p => [...p]) };
+      let moved: WordCard[] = [];
+      
+      if (source === 'tableau') {
+        moved = next.tableau[sP].splice(sC);
+        if (next.tableau[sP].length > 0) next.tableau[sP][next.tableau[sP].length - 1].isFaceUp = true;
+      } else if (source === 'waste') {
+        moved = [next.waste.pop()!];
+      } else if (source === 'foundation') {
+        moved = [next.foundations[sP].pop()!];
+      }
+      
+      next.foundations[fIdx].push(...moved);
+      next.selectedCard = null;
+      next.moves += 1;
+      return next;
+    });
+  };
 
   const handleTableauCardClick = (pileIndex: number, cardIndex: number) => {
     if (gameState.status !== 'playing') return;
@@ -208,20 +251,7 @@ const App: React.FC = () => {
     }
 
     if (cardIndex === pile.length - 1 && targetTop.category === movingCards[0].category) {
-      setGameState(prev => {
-        const next = { ...prev, tableau: prev.tableau.map(p => [...p]) };
-        let moved: WordCard[] = [];
-        if (source === 'tableau') {
-          moved = next.tableau[sP].splice(sC);
-          if (next.tableau[sP].length > 0) next.tableau[sP][next.tableau[sP].length - 1].isFaceUp = true;
-        } else if (source === 'waste') {
-          moved = [next.waste.pop()!];
-        }
-        next.tableau[pileIndex].push(...moved);
-        next.selectedCard = null;
-        next.moves += 1;
-        return next;
-      });
+      executeMoveToTableau(pileIndex, sP, sC, source);
     }
   };
 
@@ -247,44 +277,19 @@ const App: React.FC = () => {
       movingCards = [gameState.waste[gameState.waste.length - 1]];
     }
 
+    if (movingCards.length === 0) return;
     const movingCard = movingCards[0];
 
     if (foundationPile.length === 0) {
       if (movingCard.isMaster && movingCards.length === 1) {
-        setGameState(prev => {
-          const next = { ...prev, foundations: prev.foundations.map(f => [...f]), tableau: prev.tableau.map(p => [...p]) };
-          let moved: WordCard[] = [];
-          if (source === 'tableau') {
-            moved = next.tableau[sP].splice(sC);
-            if (next.tableau[sP].length > 0) next.tableau[sP][next.tableau[sP].length - 1].isFaceUp = true;
-          } else if (source === 'waste') {
-            moved = [next.waste.pop()!];
-          }
-          next.foundations[fIdx].push(...moved);
-          next.selectedCard = null;
-          next.moves += 1;
-          return next;
-        });
+        executeMoveToFoundation(fIdx, sP, sC, source);
       }
     } else {
       const masterCard = foundationPile[0];
       const targetWords = getTargetCountForCategory(masterCard.category);
       
       if (movingCards.every(c => !c.isMaster && c.category === masterCard.category) && (foundationPile.length + movingCards.length <= targetWords + 1)) {
-        setGameState(prev => {
-          const next = { ...prev, foundations: prev.foundations.map(f => [...f]), tableau: prev.tableau.map(p => [...p]) };
-          let moved: WordCard[] = [];
-          if (source === 'tableau') {
-            moved = next.tableau[sP].splice(sC);
-            if (next.tableau[sP].length > 0) next.tableau[sP][next.tableau[sP].length - 1].isFaceUp = true;
-          } else if (source === 'waste') {
-            moved = [next.waste.pop()!];
-          }
-          next.foundations[fIdx].push(...moved);
-          next.selectedCard = null;
-          next.moves += 1;
-          return next;
-        });
+        executeMoveToFoundation(fIdx, sP, sC, source);
       }
     }
   };
@@ -292,21 +297,68 @@ const App: React.FC = () => {
   const handleEmptyTableauClick = (pIdx: number) => {
     if (gameState.status !== 'playing' || !gameState.selectedCard) return;
     const { pileIndex: sP, cardIndex: sC, source } = gameState.selectedCard;
+    executeMoveToTableau(pIdx, sP, sC, source);
+  };
 
-    setGameState(prev => {
-      const next = { ...prev, tableau: prev.tableau.map(p => [...p]) };
-      let moved: WordCard[] = [];
-      if (source === 'tableau') {
-        moved = next.tableau[sP].splice(sC);
-        if (next.tableau[sP].length > 0) next.tableau[sP][next.tableau[sP].length - 1].isFaceUp = true;
-      } else if (source === 'waste') {
-        moved = [next.waste.pop()!];
+  // Drag and Drop Handlers
+  const handleDragStart = (e: React.DragEvent, pileIndex: number, cardIndex: number, source: 'tableau' | 'waste' | 'foundation') => {
+    if (gameState.status !== 'playing') {
+      e.preventDefault();
+      return;
+    }
+
+    let canDrag = false;
+    if (source === 'tableau') {
+      const pile = gameState.tableau[pileIndex];
+      const subSequence = pile.slice(cardIndex);
+      canDrag = subSequence.every(c => c.isFaceUp && c.category === subSequence[0].category);
+    } else if (source === 'waste') {
+      canDrag = true;
+    }
+
+    if (!canDrag) {
+      e.preventDefault();
+      return;
+    }
+
+    setGameState(prev => ({
+      ...prev,
+      selectedCard: { pileIndex, cardIndex, source }
+    }));
+    
+    // Set custom drag image if needed, for now use default browser one
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, type: 'tableau' | 'foundation', index: number) => {
+    e.preventDefault();
+    if (dragOverPile?.type !== type || dragOverPile?.index !== index) {
+      setDragOverPile({ type, index });
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverPile(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, type: 'tableau' | 'foundation', index: number) => {
+    e.preventDefault();
+    setDragOverPile(null);
+    if (type === 'tableau') {
+      const pile = gameState.tableau[index];
+      if (pile.length === 0) {
+        handleEmptyTableauClick(index);
+      } else {
+        handleTableauCardClick(index, pile.length - 1);
       }
-      next.tableau[pIdx].push(...moved);
-      next.selectedCard = null;
-      next.moves += 1;
-      return next;
-    });
+    } else {
+      handleFoundationClick(index);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setGameState(prev => ({ ...prev, selectedCard: null }));
+    setDragOverPile(null);
   };
 
   useEffect(() => {
@@ -420,7 +472,10 @@ const App: React.FC = () => {
                           <Card 
                             card={gameState.waste[gameState.waste.length - 1]} 
                             onClick={handleWasteCardClick} 
+                            onDragStart={(e) => handleDragStart(e, 0, gameState.waste.length - 1, 'waste')}
+                            onDragEnd={handleDragEnd}
                             isSelected={gameState.selectedCard?.source === 'waste'}
+                            isDragging={gameState.selectedCard?.source === 'waste'}
                           />
                         </div>
                       )}
@@ -436,16 +491,27 @@ const App: React.FC = () => {
                       const currentWords = pile.length > 0 ? pile.length - 1 : 0;
                       const isFull = pile.length > 0 && currentWords === targetWords;
                       const isClearing = clearingSlot === fIdx;
+                      const isDragOver = dragOverPile?.type === 'foundation' && dragOverPile.index === fIdx;
 
                       return (
-                        <div key={fIdx} onClick={() => handleFoundationClick(fIdx)} className={`relative flex flex-col items-center min-h-[160px] transition-all duration-500 ${isClearing ? 'scale-0 opacity-0 blur-lg -translate-y-12' : ''}`}>
+                        <div 
+                          key={fIdx} 
+                          onClick={() => handleFoundationClick(fIdx)} 
+                          onDragOver={(e) => handleDragOver(e, 'foundation', fIdx)}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => handleDrop(e, 'foundation', fIdx)}
+                          className={`relative flex flex-col items-center min-h-[160px] transition-all duration-500 
+                            ${isClearing ? 'scale-0 opacity-0 blur-lg -translate-y-12' : ''}
+                            ${isDragOver ? 'scale-110' : ''}
+                          `}
+                        >
                           {pile.length === 0 ? (
                             <div className={`w-24 h-36 md:w-28 md:h-40 rounded-3xl border-4 border-dashed flex items-center justify-center group transition-all bg-slate-950/20 shadow-inner
-                              ${gameState.selectedCard ? 'border-indigo-500/40 animate-pulse scale-105' : 'border-slate-800/40'}`}>
+                              ${gameState.selectedCard || isDragOver ? 'border-indigo-500/60 animate-pulse scale-105' : 'border-slate-800/40'}`}>
                               <span className="text-2xl opacity-10">★</span>
                             </div>
                           ) : (
-                            <div className="relative">
+                            <div className={`relative transition-all ${isDragOver ? 'ring-4 ring-indigo-500 rounded-3xl' : ''}`}>
                                <Card 
                                  card={pile[0]} 
                                  onClick={() => {}} 
@@ -474,37 +540,49 @@ const App: React.FC = () => {
 
               <section className="px-2">
                 <div className="flex flex-wrap gap-4 md:gap-6 justify-center max-w-[1400px] mx-auto items-start">
-                  {gameState.tableau.map((pile, pIdx) => (
-                    <div key={pIdx} className="flex flex-col items-center min-h-[400px]">
-                      {pile.length === 0 ? (
-                        <div 
-                          onClick={() => handleEmptyTableauClick(pIdx)} 
-                          className={`w-24 h-36 md:w-28 md:h-40 rounded-3xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all
-                            ${gameState.selectedCard 
-                              ? 'border-indigo-500 bg-indigo-500/5 shadow-[0_0_20px_rgba(99,102,241,0.2)] scale-105' 
-                              : 'border-slate-800/60 bg-slate-900/10 hover:border-slate-600'}
-                          `}
-                        >
-                          <span className={`text-[10px] font-black uppercase tracking-widest transition-opacity mb-2 ${gameState.selectedCard ? 'text-indigo-400 opacity-100' : 'text-slate-700 opacity-40'}`}>
-                            {gameState.selectedCard ? 'Drop Here' : 'Open'}
-                          </span>
-                          <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${gameState.selectedCard ? 'border-indigo-500 text-indigo-400' : 'border-slate-800 text-slate-800'}`}>
-                             {gameState.selectedCard ? '↓' : '+'}
+                  {gameState.tableau.map((pile, pIdx) => {
+                    const isDragOver = dragOverPile?.type === 'tableau' && dragOverPile.index === pIdx;
+                    return (
+                      <div 
+                        key={pIdx} 
+                        onDragOver={(e) => handleDragOver(e, 'tableau', pIdx)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, 'tableau', pIdx)}
+                        className={`flex flex-col items-center min-h-[400px] transition-all rounded-3xl p-1 ${isDragOver ? 'bg-indigo-500/10 ring-2 ring-indigo-500/30' : ''}`}
+                      >
+                        {pile.length === 0 ? (
+                          <div 
+                            onClick={() => handleEmptyTableauClick(pIdx)} 
+                            className={`w-24 h-36 md:w-28 md:h-40 rounded-3xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all
+                              ${gameState.selectedCard || isDragOver
+                                ? 'border-indigo-500 bg-indigo-500/5 shadow-[0_0_20px_rgba(99,102,241,0.2)] scale-105' 
+                                : 'border-slate-800/60 bg-slate-900/10 hover:border-slate-600'}
+                            `}
+                          >
+                            <span className={`text-[10px] font-black uppercase tracking-widest transition-opacity mb-2 ${gameState.selectedCard ? 'text-indigo-400 opacity-100' : 'text-slate-700 opacity-40'}`}>
+                              {gameState.selectedCard ? 'Drop Here' : 'Open'}
+                            </span>
+                            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${gameState.selectedCard ? 'border-indigo-500 text-indigo-400' : 'border-slate-800 text-slate-800'}`}>
+                               {gameState.selectedCard ? '↓' : '+'}
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        pile.map((card, cIdx) => (
-                          <Card 
-                            key={card.id} 
-                            card={card} 
-                            onClick={() => handleTableauCardClick(pIdx, cIdx)} 
-                            isSelected={gameState.selectedCard?.source === 'tableau' && gameState.selectedCard.pileIndex === pIdx && cIdx >= gameState.selectedCard.cardIndex} 
-                            stacked={cIdx > 0} 
-                          />
-                        ))
-                      )}
-                    </div>
-                  ))}
+                        ) : (
+                          pile.map((card, cIdx) => (
+                            <Card 
+                              key={card.id} 
+                              card={card} 
+                              onClick={() => handleTableauCardClick(pIdx, cIdx)} 
+                              onDragStart={(e) => handleDragStart(e, pIdx, cIdx, 'tableau')}
+                              onDragEnd={handleDragEnd}
+                              isSelected={gameState.selectedCard?.source === 'tableau' && gameState.selectedCard.pileIndex === pIdx && cIdx >= gameState.selectedCard.cardIndex} 
+                              isDragging={gameState.selectedCard?.source === 'tableau' && gameState.selectedCard.pileIndex === pIdx && cIdx >= gameState.selectedCard.cardIndex}
+                              stacked={cIdx > 0} 
+                            />
+                          ))
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
             </>
