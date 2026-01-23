@@ -29,8 +29,14 @@ export interface GameState {
   stock: WordCard[];
   waste: WordCard[];
   selectedCard: { pileIndex: number; cardIndex: number; source: 'tableau' | 'foundation' | 'waste' } | null;
-  status: 'loading' | 'playing' | 'won' | 'gameOver';
+  status: 'loading' | 'playing' | 'won' | 'gameOver' | 'finished';
   moves: number;
   targetMoves: number;
   solvedCategories: number;
+  hintsRemaining: number;
+  undosRemaining: number;
+  hintHighlight: {
+    source: { type: 'tableau' | 'waste' | 'stock'; pileIndex: number; cardIndex: number } | null;
+    target: { type: 'tableau' | 'foundation'; index: number } | null;
+  } | null;
 }
