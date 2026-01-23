@@ -1,8 +1,8 @@
 
-import { GameLevel, DifficultyLevel } from "../types";
-import { CATEGORY_COLORS, DIFFICULTY_CONFIG, MIN_WORDS_PER_CATEGORY, MAX_WORDS_PER_CATEGORY } from "../constants";
-import { WORD_DATABASE } from "../data/wordDatabase";
-import { shuffleArray } from "../utils/gameLogic";
+import { GameLevel, DifficultyLevel } from "../types.ts";
+import { CATEGORY_COLORS, DIFFICULTY_CONFIG, MIN_WORDS_PER_CATEGORY, MAX_WORDS_PER_CATEGORY } from "../constants.ts";
+import { WORD_DATABASE } from "../data/wordDatabase.ts";
+import { shuffleArray } from "../utils/gameLogic.ts";
 
 export const generateLevel = async (theme: string, difficulty: DifficultyLevel): Promise<GameLevel> => {
   // Simulate a tiny delay for UX transitions

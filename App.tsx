@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { GameState, GameLevel, WordCard, DifficultyLevel } from './types';
-import { generateLevel } from './services/levelService';
-import { createDeck, dealTableau } from './utils/gameLogic';
-import { GAME_THEMES, DIFFICULTY_CONFIG } from './constants';
-import Card from './components/Card';
+import React, { useState, useEffect, useCallback } from 'react';
+import { GameState, GameLevel, WordCard, DifficultyLevel } from './types.ts';
+import { generateLevel } from './services/levelService.ts';
+import { createDeck, dealTableau } from './utils/gameLogic.ts';
+import { GAME_THEMES, DIFFICULTY_CONFIG } from './constants.ts';
+import Card from './components/Card.tsx';
 
 const FOUNDATION_SLOTS = 4;
 
@@ -39,7 +39,6 @@ const App: React.FC = () => {
       
       setGameState({
         tableau,
-        // Hardcoded to exactly 4 foundation slots for added challenge
         foundations: Array.from({ length: FOUNDATION_SLOTS }, () => []), 
         stock: stock.map(c => ({ ...c, isFaceUp: false })),
         waste: [],
@@ -57,7 +56,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     startNewGame();
-  }, []);
+  }, [startNewGame]);
 
   const getTargetCountForCategory = useCallback((categoryName: string) => {
     if (!currentLevel) return 0;
@@ -154,30 +153,24 @@ const App: React.FC = () => {
     }
   };
 
-  const finalizeFoundation = (fIdx: number) => {
-    const pile = gameState.foundations[fIdx];
-    if (pile.length === 0) return;
-    
-    const targetWords = getTargetCountForCategory(pile[0].category);
-    if (pile.length === targetWords + 1) { 
-      setClearingSlot(fIdx);
-      setTimeout(() => {
-        setGameState(prev => {
-          const newFoundations = prev.foundations.map((f, idx) => idx === fIdx ? [] : [...f]);
-          const newSolved = prev.solvedCategories + 1;
-          const totalCats = currentLevel?.categories.length || 0;
-          
-          return {
-            ...prev,
-            foundations: newFoundations,
-            solvedCategories: newSolved,
-            status: newSolved === totalCats ? 'won' : 'playing'
-          };
-        });
-        setClearingSlot(null);
-      }, 600);
-    }
-  };
+  const finalizeFoundation = useCallback((fIdx: number) => {
+    setClearingSlot(fIdx);
+    setTimeout(() => {
+      setGameState(prev => {
+        const newFoundations = prev.foundations.map((f, idx) => idx === fIdx ? [] : [...f]);
+        const newSolved = prev.solvedCategories + 1;
+        const totalCats = currentLevel?.categories.length || 0;
+        
+        return {
+          ...prev,
+          foundations: newFoundations,
+          solvedCategories: newSolved,
+          status: newSolved === totalCats ? 'won' : 'playing'
+        };
+      });
+      setClearingSlot(null);
+    }, 600);
+  }, [currentLevel]);
 
   const handleTableauCardClick = (pileIndex: number, cardIndex: number) => {
     if (gameState.status !== 'playing') return;
@@ -327,7 +320,7 @@ const App: React.FC = () => {
             }
         });
     }
-  }, [gameState.foundations, getTargetCountForCategory, clearingSlot, gameState.status]);
+  }, [gameState.foundations, getTargetCountForCategory, clearingSlot, gameState.status, finalizeFoundation]);
 
   useEffect(() => {
     if (gameState.status === 'playing' && clearingSlot === null) {

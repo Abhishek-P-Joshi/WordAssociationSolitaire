@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { WordCard } from '../types';
+import { WordCard } from '../types.ts';
 
 interface CardProps {
   card: WordCard;

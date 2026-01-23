@@ -1,5 +1,5 @@
 
-import { WordCard, GameLevel } from '../types';
+import { WordCard, GameLevel } from '../types.ts';
 
 export const shuffleArray = <T,>(array: T[]): T[] => {
   const newArray = [...array];
