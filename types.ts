@@ -20,6 +20,7 @@ export interface GameLevel {
   theme: string;
   categories: WordCategory[];
   targetMoves: number;
+  optimalMoves: number; // Theoretical minimum/par moves
   difficulty: DifficultyLevel;
 }
 

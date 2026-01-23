@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { GameState, GameLevel, WordCard, DifficultyLevel } from './types.ts';
 import { generateLevel } from './services/levelService.ts';
 import { createDeck, dealTableau } from './utils/gameLogic.ts';
@@ -91,6 +91,13 @@ const App: React.FC = () => {
     const cat = currentLevel.categories.find(c => c.name === categoryName);
     return cat ? cat.words.length : 0; 
   }, [currentLevel]);
+
+  // Efficiency calculation
+  const efficiency = useMemo(() => {
+    if (!currentLevel || gameState.moves === 0) return 0;
+    const eff = (currentLevel.optimalMoves / gameState.moves) * 100;
+    return Math.min(Math.round(eff), 100);
+  }, [gameState.moves, currentLevel]);
 
   // Check if any move is possible on the board
   const findPossibleMove = useCallback((state: GameState) => {
@@ -403,13 +410,26 @@ const App: React.FC = () => {
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 backdrop-blur-xl bg-black/50 animate-in fade-in duration-500">
             <div className={`max-w-md w-full p-10 rounded-[4rem] shadow-2xl border text-center transform animate-in zoom-in-95 slide-in-from-bottom-12 duration-500 ${theme === 'dark' ? 'bg-slate-900 border-indigo-500/20 shadow-indigo-500/10' : 'bg-white border-slate-200 shadow-slate-200'}`}>
               
-              <h2 className={`text-5xl font-black mb-6 uppercase tracking-tighter ${gameState.status === 'won' ? 'text-amber-500' : 'text-rose-500'}`}>
+              <h2 className={`text-5xl font-black mb-2 uppercase tracking-tighter ${gameState.status === 'won' ? 'text-amber-500' : 'text-rose-500'}`}>
                 {gameState.status === 'won' ? 'Victory' : 'Stopped'}
               </h2>
+
+              {gameState.status === 'won' && (
+                <div className="mb-8 flex flex-col items-center">
+                   <div className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 mb-2">Efficiency Rating</div>
+                   <div className="flex items-baseline gap-2">
+                     <span className="text-6xl font-black text-white tracking-tighter">{efficiency}%</span>
+                     <span className="text-indigo-400 font-bold uppercase text-xs">Optimal</span>
+                   </div>
+                   <div className="w-full h-1.5 bg-slate-800 rounded-full mt-4 overflow-hidden max-w-[200px]">
+                      <div className="h-full bg-indigo-500 transition-all duration-1000 ease-out" style={{ width: `${efficiency}%` }} />
+                   </div>
+                </div>
+              )}
               
               <p className={`mb-10 text-lg font-medium leading-relaxed ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                 {gameState.status === 'won' 
-                  ? `Incredible mastery! You deciphered all associations in ${gameState.moves} clever moves.`
+                  ? `Incredible mastery! You deciphered all associations in ${gameState.moves} moves. Theoretical best was ${currentLevel?.optimalMoves}.`
                   : "No more logical connections found. The journey ends here... for now."}
               </p>
 
@@ -478,8 +498,10 @@ const App: React.FC = () => {
             <div className={`w-px h-8 hidden sm:block ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
             <div className="flex items-center gap-6 px-4 font-black">
               <div className="text-center">
-                <span className="block text-[10px] uppercase opacity-40 mb-0.5">Moves</span>
-                <span className="text-2xl tracking-tighter">{gameState.moves}</span>
+                <span className="block text-[10px] uppercase opacity-40 mb-0.5">Moves / Par</span>
+                <span className="text-2xl tracking-tighter">
+                  {gameState.moves} <span className="text-indigo-500/50 mx-1">/</span> {currentLevel?.optimalMoves || '--'}
+                </span>
               </div>
               <div className={`w-px h-8 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
               <div className="text-center">

@@ -12,6 +12,7 @@ export const generateLevel = async (theme: string, difficulty: DifficultyLevel):
   const allCategories = Object.keys(WORD_DATABASE);
   const selectedCategoryNames = shuffleArray(allCategories).slice(0, config.categoryCount);
   
+  let totalCards = 0;
   const categories = selectedCategoryNames.map((name, index) => {
     const allWordsFromDB = WORD_DATABASE[name];
     
@@ -21,6 +22,9 @@ export const generateLevel = async (theme: string, difficulty: DifficultyLevel):
     // Pick unique words from the DB
     const selectedWords = shuffleArray(allWordsFromDB).slice(0, Math.min(randomWordCount, allWordsFromDB.length));
     
+    // Track cards: 1 Master + word cards
+    totalCards += (1 + selectedWords.length);
+
     return {
       name,
       words: selectedWords,
@@ -28,10 +32,18 @@ export const generateLevel = async (theme: string, difficulty: DifficultyLevel):
     };
   });
 
+  // Calculate Optimal/Par Moves:
+  // - 1 move per card to place it in foundation (totalCards)
+  // - Estimated stock draws (approx 1/3 of total cards are in stock, each takes 1 click)
+  // - Plus 15% overhead for necessary tableau organization
+  const stockEstimate = Math.floor(totalCards * 0.35);
+  const optimalMoves = Math.round((totalCards + stockEstimate) * 1.15);
+
   return {
     theme,
     difficulty,
     categories,
-    targetMoves: Math.round(config.categoryCount * 15) // Slightly increased move budget for potentially larger categories
+    targetMoves: Math.round(config.categoryCount * 15),
+    optimalMoves
   };
 };
