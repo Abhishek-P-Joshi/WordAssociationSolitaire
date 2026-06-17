@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { GameState, GameLevel, WordCard, DifficultyLevel } from './types.ts';
 import { generateLevel } from './services/levelService.ts';
 import { createDeck, dealTableau } from './utils/gameLogic.ts';
@@ -652,6 +653,7 @@ const App: React.FC = () => {
             Semantic Puzzle &bull; Find Logical Groups &bull; Link the Word to the <span className="text-indigo-500">Master</span>
          </div>
       </footer>
+      <Analytics />
     </div>
   );
 };
